@@ -3,7 +3,21 @@
  * Client-side routing, filtering, match scoring, and job rendering
  */
 
-const ROUTES = ['', 'dashboard', 'saved', 'digest', 'settings', 'proof'];
+const ROUTES = ['', 'dashboard', 'saved', 'digest', 'settings', 'proof', 'jt/07-test', 'jt/08-ship'];
+const TEST_CHECKLIST_KEY = 'jobTrackerTestChecklist';
+
+const TEST_ITEMS = [
+  { id: 0, label: 'Preferences persist after refresh', hint: 'Save preferences in Settings, refresh page, confirm values are still there.' },
+  { id: 1, label: 'Match score calculates correctly', hint: 'Set preferences, check job cards show numeric scores matching spec rules.' },
+  { id: 2, label: '"Show only matches" toggle works', hint: 'Enable toggle on Dashboard, confirm only jobs above threshold appear.' },
+  { id: 3, label: 'Save job persists after refresh', hint: 'Save a job, refresh, go to Saved — job should still appear.' },
+  { id: 4, label: 'Apply opens in new tab', hint: 'Click Apply on any job card, confirm it opens in a new tab.' },
+  { id: 5, label: 'Status update persists after refresh', hint: 'Change status to Applied/Rejected/Selected, refresh — status should remain.' },
+  { id: 6, label: 'Status filter works correctly', hint: 'Filter by Applied on Dashboard, confirm only Applied jobs show.' },
+  { id: 7, label: 'Digest generates top 10 by score', hint: 'Generate digest, confirm 10 jobs sorted by match score.' },
+  { id: 8, label: 'Digest persists for the day', hint: 'Generate digest, refresh page — digest should still be visible.' },
+  { id: 9, label: 'No console errors on main pages', hint: 'Navigate Dashboard, Saved, Digest, Settings — check DevTools console for errors.' }
+];
 const SAVED_IDS_KEY = 'job-tracker-saved-ids';
 const PREFERENCES_KEY = 'jobTrackerPreferences';
 const STATUS_KEY = 'jobTrackerStatus';
@@ -119,6 +133,35 @@ function getStatusUpdates() {
   } catch {
     return [];
   }
+}
+
+function getTestChecklist() {
+  try {
+    const raw = localStorage.getItem(TEST_CHECKLIST_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function setTestChecklistItem(id, checked) {
+  const checklist = getTestChecklist();
+  checklist[id] = checked;
+  localStorage.setItem(TEST_CHECKLIST_KEY, JSON.stringify(checklist));
+}
+
+function resetTestChecklist() {
+  localStorage.removeItem(TEST_CHECKLIST_KEY);
+}
+
+function getAllTestsPassed() {
+  const checklist = getTestChecklist();
+  return TEST_ITEMS.every((item) => checklist[item.id] === true);
+}
+
+function getTestsPassedCount() {
+  const checklist = getTestChecklist();
+  return TEST_ITEMS.filter((item) => checklist[item.id] === true).length;
 }
 
 function showToast(message) {
@@ -529,7 +572,9 @@ function renderPage(route) {
     saved: renderSaved,
     digest: renderDigest,
     settings: renderSettings,
-    proof: renderProof
+    proof: renderProof,
+    'jt/07-test': renderTestChecklist,
+    'jt/08-ship': renderShip
   };
 
   const render = pages[route] || renderLanding;
@@ -578,6 +623,20 @@ function bindPageEvents(content, route) {
       };
       savePreferences(prefs);
       navigate('dashboard');
+    });
+  }
+
+  if (route === 'jt/07-test') {
+    content.querySelectorAll('.kn-test-item__checkbox').forEach((cb) => {
+      cb.addEventListener('change', (e) => {
+        const id = parseInt(e.target.dataset.testId, 10);
+        setTestChecklistItem(id, e.target.checked);
+        renderPage('jt/07-test');
+      });
+    });
+    content.querySelector('[data-action="reset-tests"]')?.addEventListener('click', () => {
+      resetTestChecklist();
+      renderPage('jt/07-test');
     });
   }
 
@@ -886,11 +945,80 @@ function renderProof() {
   `;
 }
 
+function renderTestChecklist() {
+  const passed = getTestsPassedCount();
+  const total = TEST_ITEMS.length;
+  const allPassed = passed === total;
+  const checklist = getTestChecklist();
+
+  return `
+    <div class="kn-page kn-page--test">
+      <div class="kn-page__header">
+        <h1 class="kn-page__title">Test Checklist</h1>
+        <p class="kn-page__subtext">Verify all features before shipping.</p>
+      </div>
+      <div class="kn-test-summary ${allPassed ? 'kn-test-summary--pass' : 'kn-test-summary--warn'}">
+        <span class="kn-test-summary__count">Tests Passed: ${passed} / ${total}</span>
+        ${!allPassed ? '<p class="kn-test-summary__warning">Resolve all issues before shipping.</p>' : ''}
+      </div>
+      <div class="kn-test-actions">
+        <button type="button" class="kn-btn kn-btn--secondary kn-btn--sm" data-action="reset-tests">Reset Test Status</button>
+      </div>
+      <div class="kn-test-checklist">
+        ${TEST_ITEMS.map(
+          (item) => `
+          <label class="kn-test-item">
+            <input type="checkbox" class="kn-test-item__checkbox" data-test-id="${item.id}" ${checklist[item.id] ? 'checked' : ''}>
+            <span class="kn-test-item__label">${item.label}</span>
+            <span class="kn-test-item__hint" title="${item.hint}">?</span>
+          </label>
+        `
+        ).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderShip() {
+  const allPassed = getAllTestsPassed();
+
+  if (!allPassed) {
+    return `
+      <div class="kn-page kn-page--ship">
+        <div class="kn-page__header">
+          <h1 class="kn-page__title">Ship</h1>
+        </div>
+        <div class="kn-ship-lock">
+          <p class="kn-ship-lock__message">Complete all 10 test checklist items to unlock Ship.</p>
+          <a href="#/jt/07-test" class="kn-btn kn-btn--primary">Go to Test Checklist</a>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="kn-page kn-page--ship">
+      <div class="kn-page__header">
+        <h1 class="kn-page__title">Ship</h1>
+        <p class="kn-page__subtext">All tests passed. Ready to ship.</p>
+      </div>
+      <div class="kn-ship-unlocked">
+        <p class="kn-ship-unlocked__message">All quality checks complete. You may proceed with deployment.</p>
+      </div>
+    </div>
+  `;
+}
+
 function setActiveNav(route) {
   document.querySelectorAll('.kn-nav__link').forEach((link) => {
     const linkRoute = link.getAttribute('data-route') || link.getAttribute('href')?.replace(/^#\/?/, '') || '';
     link.classList.toggle('kn-nav__link--active', linkRoute === route);
   });
+  const shipLink = document.querySelector('[data-route="jt/08-ship"]');
+  if (shipLink) {
+    shipLink.classList.toggle('kn-nav__link--locked', !getAllTestsPassed());
+    shipLink.title = getAllTestsPassed() ? 'Ship' : 'Complete all tests to unlock';
+  }
 }
 
 function navigate(route) {
