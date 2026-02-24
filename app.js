@@ -75,6 +75,66 @@ function isSaved(id) {
   return getSavedIds().includes(id);
 }
 
+function getDigestKey(date) {
+  const d = date || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `jobTrackerDigest_${y}-${m}-${day}`;
+}
+
+function getTodayDigest() {
+  try {
+    const raw = localStorage.getItem(getDigestKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function generateTodayDigest() {
+  const prefs = getPreferences();
+  if (!prefs) return null;
+
+  const jobsWithScores = JOBS.map((j) => ({
+    ...j,
+    matchScore: computeMatchScore(j, prefs)
+  }));
+
+  const sorted = [...jobsWithScores].sort((a, b) => {
+    if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+    return a.postedDaysAgo - b.postedDaysAgo;
+  });
+
+  const top10 = sorted.slice(0, 10);
+  const digest = { date: getDigestKey().replace('jobTrackerDigest_', ''), jobs: top10 };
+  localStorage.setItem(getDigestKey(), JSON.stringify(digest));
+  return digest;
+}
+
+function getOrGenerateDigest() {
+  const existing = getTodayDigest();
+  if (existing) return existing;
+  return generateTodayDigest();
+}
+
+function formatDigestAsPlainText(jobs) {
+  const dateStr = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const header = `Top 10 Jobs For You — 9AM Digest\n${dateStr}\n\n`;
+  const body = jobs
+    .map(
+      (j, i) =>
+        `${i + 1}. ${j.title} — ${j.company}\n   ${j.location} · ${j.experience} · Match: ${j.matchScore}\n   ${j.applyUrl}`
+    )
+    .join('\n\n');
+  return header + body;
+}
+
 /**
  * Match score engine — exact rules per specification:
  * +25 if any roleKeyword in job.title (case-insensitive)
@@ -407,6 +467,36 @@ function bindPageEvents(content, route) {
     });
   }
 
+  if (route === 'digest') {
+    content.querySelector('[data-action="generate-digest"]')?.addEventListener('click', () => {
+      getOrGenerateDigest();
+      renderPage('digest');
+    });
+    content.querySelector('[data-action="copy-digest"]')?.addEventListener('click', () => {
+      const digest = getTodayDigest();
+      if (digest?.jobs?.length) {
+        const text = formatDigestAsPlainText(digest.jobs);
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = content.querySelector('[data-action="copy-digest"]');
+          if (btn) {
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = orig; }, 1500);
+          }
+        });
+      }
+    });
+    content.querySelector('[data-action="email-draft"]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const digest = getTodayDigest();
+      if (digest?.jobs?.length) {
+        const body = encodeURIComponent(formatDigestAsPlainText(digest.jobs));
+        const subject = encodeURIComponent('My 9AM Job Digest');
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+      }
+    });
+  }
+
   if (route === 'dashboard' || route === 'saved') {
     content.querySelectorAll('[data-action="view"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -504,12 +594,99 @@ function renderSaved() {
 }
 
 function renderDigest() {
+  const prefs = getPreferences();
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  if (!prefs) {
+    return `
+      <div class="kn-page">
+        <div class="kn-page__header">
+          <h1 class="kn-page__title">Digest</h1>
+        </div>
+        <div class="kn-digest-block">
+          <p class="kn-digest-block__message">Set preferences to generate a personalized digest.</p>
+          <a href="#/settings" class="kn-btn kn-btn--primary">Go to Settings</a>
+        </div>
+      </div>
+    `;
+  }
+
+  const digest = getTodayDigest();
+  const digestJobs = digest?.jobs || [];
+  const hasDigest = digest !== null;
+
+  if (hasDigest && digestJobs.length === 0) {
+    return `
+      <div class="kn-page kn-page--digest">
+        <div class="kn-page__header">
+          <h1 class="kn-page__title">Digest</h1>
+        </div>
+        <div class="kn-digest-actions">
+          <button type="button" class="kn-btn kn-btn--secondary" data-action="generate-digest">Generate Today's 9AM Digest (Simulated)</button>
+        </div>
+        <p class="kn-digest__note">Demo Mode: Daily 9AM trigger simulated manually.</p>
+        <div class="kn-digest-block">
+          <p class="kn-digest-block__message">No matching roles today. Check again tomorrow.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!hasDigest) {
+    return `
+      <div class="kn-page kn-page--digest">
+        <div class="kn-page__header">
+          <h1 class="kn-page__title">Digest</h1>
+        </div>
+        <div class="kn-digest-actions">
+          <button type="button" class="kn-btn kn-btn--secondary" data-action="generate-digest">Generate Today's 9AM Digest (Simulated)</button>
+        </div>
+        <p class="kn-digest__note">Demo Mode: Daily 9AM trigger simulated manually.</p>
+      </div>
+    `;
+  }
+
   return `
-    <div class="kn-page__header">
-      <h1 class="kn-page__title">Digest</h1>
-    </div>
-    <div class="kn-empty">
-      <p class="kn-empty__message">Your daily digest will appear here once you configure your preferences.</p>
+    <div class="kn-page kn-page--digest">
+      <div class="kn-page__header">
+        <h1 class="kn-page__title">Digest</h1>
+      </div>
+      <div class="kn-digest-actions">
+        <button type="button" class="kn-btn kn-btn--secondary" data-action="generate-digest">Generate Today's 9AM Digest (Simulated)</button>
+      </div>
+      <p class="kn-digest__note">Demo Mode: Daily 9AM trigger simulated manually.</p>
+      <div class="kn-digest-card">
+        <h2 class="kn-digest-card__title">Top 10 Jobs For You — 9AM Digest</h2>
+        <p class="kn-digest-card__date">${dateStr}</p>
+        <div class="kn-digest-card__jobs">
+          ${digestJobs
+            .map(
+              (j) => `
+            <div class="kn-digest-item">
+              <div class="kn-digest-item__header">
+                <h3 class="kn-digest-item__title">${j.title}</h3>
+                <span class="kn-digest-item__score">${j.matchScore}</span>
+              </div>
+              <p class="kn-digest-item__company">${j.company}</p>
+              <p class="kn-digest-item__meta">${j.location} · ${j.experience}</p>
+              <a href="${j.applyUrl}" target="_blank" rel="noopener" class="kn-btn kn-btn--primary kn-digest-item__apply">Apply</a>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+        <p class="kn-digest-card__footer">This digest was generated based on your preferences.</p>
+        <div class="kn-digest-card__actions">
+          <button type="button" class="kn-btn kn-btn--secondary" data-action="copy-digest">Copy Digest to Clipboard</button>
+          <a href="#" class="kn-btn kn-btn--secondary" data-action="email-draft">Create Email Draft</a>
+        </div>
+      </div>
     </div>
   `;
 }
