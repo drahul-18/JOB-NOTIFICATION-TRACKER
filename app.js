@@ -1,10 +1,20 @@
 /**
  * Job Notification Tracker — Premium SaaS App
- * Client-side routing, filtering, and job rendering
+ * Client-side routing, filtering, match scoring, and job rendering
  */
 
 const ROUTES = ['', 'dashboard', 'saved', 'digest', 'settings', 'proof'];
 const SAVED_IDS_KEY = 'job-tracker-saved-ids';
+const PREFERENCES_KEY = 'jobTrackerPreferences';
+
+const DEFAULT_PREFERENCES = {
+  roleKeywords: '',
+  preferredLocations: [],
+  preferredMode: [],
+  experienceLevel: '',
+  skills: '',
+  minMatchScore: 40
+};
 
 let filterState = {
   keyword: '',
@@ -12,7 +22,8 @@ let filterState = {
   mode: '',
   experience: '',
   source: '',
-  sort: 'latest'
+  sort: 'latest',
+  showMatchesOnly: false
 };
 
 function getRoute() {
@@ -21,6 +32,21 @@ function getRoute() {
   if (hash) return hash;
   if (path && ROUTES.includes(path)) return path;
   return '';
+}
+
+function getPreferences() {
+  try {
+    const raw = localStorage.getItem(PREFERENCES_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_PREFERENCES, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
+function savePreferences(prefs) {
+  localStorage.setItem(PREFERENCES_KEY, JSON.stringify(prefs));
 }
 
 function getSavedIds() {
@@ -49,8 +75,96 @@ function isSaved(id) {
   return getSavedIds().includes(id);
 }
 
+/**
+ * Match score engine — exact rules per specification:
+ * +25 if any roleKeyword in job.title (case-insensitive)
+ * +15 if any roleKeyword in job.description
+ * +15 if job.location in preferredLocations
+ * +10 if job.mode in preferredMode
+ * +10 if job.experience matches experienceLevel
+ * +15 if overlap between job.skills and user.skills
+ * +5 if postedDaysAgo <= 2
+ * +5 if source is LinkedIn
+ * Cap at 100
+ */
+function computeMatchScore(job, prefs) {
+  if (!prefs) return 0;
+
+  let score = 0;
+
+  const roleKeywords = (prefs.roleKeywords || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const userSkills = (prefs.skills || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const preferredLocations = (prefs.preferredLocations || []).map((l) =>
+    l.toLowerCase()
+  );
+  const preferredMode = (prefs.preferredMode || []).map((m) => m.toLowerCase());
+
+  if (roleKeywords.length > 0) {
+    const titleLower = job.title.toLowerCase();
+    if (roleKeywords.some((k) => titleLower.includes(k))) score += 25;
+  }
+
+  if (roleKeywords.length > 0 && job.description) {
+    const descLower = job.description.toLowerCase();
+    if (roleKeywords.some((k) => descLower.includes(k))) score += 15;
+  }
+
+  if (preferredLocations.length > 0) {
+    if (preferredLocations.includes(job.location.toLowerCase())) score += 15;
+  }
+
+  if (preferredMode.length > 0) {
+    if (preferredMode.includes(job.mode.toLowerCase())) score += 10;
+  }
+
+  if (prefs.experienceLevel) {
+    if (
+      job.experience.toLowerCase() === prefs.experienceLevel.toLowerCase()
+    ) {
+      score += 10;
+    }
+  }
+
+  if (userSkills.length > 0 && job.skills) {
+    const jobSkillsLower = job.skills.map((s) => s.toLowerCase());
+    const hasOverlap = userSkills.some((us) =>
+      jobSkillsLower.some((js) => js.includes(us) || us.includes(js))
+    );
+    if (hasOverlap) score += 15;
+  }
+
+  if (job.postedDaysAgo <= 2) score += 5;
+
+  if (job.source && job.source.toLowerCase() === 'linkedin') score += 5;
+
+  return Math.min(score, 100);
+}
+
+function getMatchScoreBadgeClass(score) {
+  if (score >= 80) return 'kn-job-card__score--high';
+  if (score >= 60) return 'kn-job-card__score--medium';
+  if (score >= 40) return 'kn-job-card__score--neutral';
+  return 'kn-job-card__score--low';
+}
+
+function extractSalaryValue(salaryRange) {
+  if (!salaryRange) return 0;
+  const match = salaryRange.match(/₹?(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
 function getFilteredJobs(jobs) {
-  let result = [...jobs];
+  const prefs = getPreferences();
+  let result = jobs.map((job) => ({
+    ...job,
+    matchScore: computeMatchScore(job, prefs)
+  }));
 
   if (filterState.keyword) {
     const k = filterState.keyword.toLowerCase();
@@ -81,10 +195,22 @@ function getFilteredJobs(jobs) {
     );
   }
 
+  if (filterState.showMatchesOnly && prefs) {
+    const threshold = prefs.minMatchScore ?? 40;
+    result = result.filter((j) => j.matchScore >= threshold);
+  }
+
   if (filterState.sort === 'latest') {
     result.sort((a, b) => a.postedDaysAgo - b.postedDaysAgo);
   } else if (filterState.sort === 'oldest') {
     result.sort((a, b) => b.postedDaysAgo - a.postedDaysAgo);
+  } else if (filterState.sort === 'match') {
+    result.sort((a, b) => b.matchScore - a.matchScore);
+  } else if (filterState.sort === 'salary') {
+    result.sort(
+      (a, b) =>
+        extractSalaryValue(b.salaryRange) - extractSalaryValue(a.salaryRange)
+    );
   }
 
   return result;
@@ -106,6 +232,7 @@ function renderFilterBar(container, jobs) {
   const modes = getUniqueValues(jobs, 'mode');
   const experiences = getUniqueValues(jobs, 'experience');
   const sources = getUniqueValues(jobs, 'source');
+  const prefs = getPreferences();
 
   container.innerHTML = `
     <div class="kn-filters">
@@ -129,13 +256,23 @@ function renderFilterBar(container, jobs) {
       <select class="kn-input kn-input--select kn-filters__select" data-filter="sort">
         <option value="latest" ${filterState.sort === 'latest' ? 'selected' : ''}>Latest</option>
         <option value="oldest" ${filterState.sort === 'oldest' ? 'selected' : ''}>Oldest</option>
+        <option value="match" ${filterState.sort === 'match' ? 'selected' : ''}>Match Score</option>
+        <option value="salary" ${filterState.sort === 'salary' ? 'selected' : ''}>Salary</option>
       </select>
     </div>
+    <label class="kn-filters__toggle">
+      <input type="checkbox" class="kn-filters__checkbox" ${filterState.showMatchesOnly ? 'checked' : ''} data-action="show-matches">
+      <span>Show only jobs above my threshold</span>
+    </label>
   `;
 
+  let searchTimeout;
   container.querySelector('.kn-filters__search').addEventListener('input', (e) => {
-    filterState.keyword = e.target.value;
-    renderPage(getRoute());
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      filterState.keyword = e.target.value;
+      renderPage(getRoute());
+    }, 200);
   });
   container.querySelectorAll('[data-filter]').forEach((el) => {
     el.addEventListener('change', (e) => {
@@ -143,15 +280,25 @@ function renderFilterBar(container, jobs) {
       renderPage(getRoute());
     });
   });
+  container.querySelector('[data-action="show-matches"]')?.addEventListener('change', (e) => {
+    filterState.showMatchesOnly = e.target.checked;
+    renderPage(getRoute());
+  });
 }
 
 function renderJobCard(job, showUnsave = false) {
   const saved = isSaved(job.id);
+  const score = job.matchScore ?? 0;
+  const scoreClass = getMatchScoreBadgeClass(score);
+
   return `
     <article class="kn-job-card" data-id="${job.id}">
       <div class="kn-job-card__header">
         <h3 class="kn-job-card__title">${job.title}</h3>
-        <span class="kn-job-card__badge kn-job-card__badge--${job.source.toLowerCase()}">${job.source}</span>
+        <div class="kn-job-card__badges">
+          <span class="kn-job-card__score ${scoreClass}">${score}</span>
+          <span class="kn-job-card__badge kn-job-card__badge--${job.source.toLowerCase()}">${job.source}</span>
+        </div>
       </div>
       <p class="kn-job-card__company">${job.company}</p>
       <p class="kn-job-card__meta">${job.location} · ${job.mode} · ${job.experience}</p>
@@ -230,6 +377,36 @@ function bindPageEvents(content, route) {
     });
   }
 
+  if (route === 'settings') {
+    const slider = content.querySelector('#min-match-score');
+    const valueEl = content.querySelector('#min-match-value');
+    slider?.addEventListener('input', (e) => {
+      if (valueEl) valueEl.textContent = e.target.value;
+    });
+
+    const form = content.querySelector('#settings-form');
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const prefs = {
+        roleKeywords: content.querySelector('#role-keywords')?.value?.trim() || '',
+        preferredLocations: Array.from(
+          content.querySelector('#preferred-locations')?.selectedOptions || []
+        ).map((o) => o.value),
+        preferredMode: Array.from(
+          content.querySelectorAll('input[name="preferred-mode"]:checked')
+        ).map((c) => c.value),
+        experienceLevel: content.querySelector('#experience-level')?.value || '',
+        skills: content.querySelector('#skills')?.value?.trim() || '',
+        minMatchScore: parseInt(
+          content.querySelector('#min-match-score')?.value || '40',
+          10
+        )
+      };
+      savePreferences(prefs);
+      navigate('dashboard');
+    });
+  }
+
   if (route === 'dashboard' || route === 'saved') {
     content.querySelectorAll('[data-action="view"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -266,17 +443,28 @@ function renderLanding() {
 }
 
 function renderDashboard() {
+  const prefs = getPreferences();
   const filtered = getFilteredJobs(JOBS);
+
+  const emptyMessage =
+    filterState.showMatchesOnly && prefs
+      ? 'No roles match your criteria. Adjust filters or lower threshold.'
+      : 'No jobs match your filters. Try adjusting your search.';
+
+  const banner = !prefs
+    ? '<div class="kn-banner">Set your preferences to activate intelligent matching.</div>'
+    : '';
 
   return `
     <div class="kn-page kn-page--wide">
+    ${banner}
     <div class="kn-page__header">
       <h1 class="kn-page__title">Dashboard</h1>
     </div>
     <div class="kn-filters-wrap" id="filters-container"></div>
     <div class="kn-jobs">
       ${filtered.length === 0
-        ? '<div class="kn-empty"><p class="kn-empty__message">No jobs match your filters. Try adjusting your search.</p></div>'
+        ? `<div class="kn-empty"><p class="kn-empty__message">${emptyMessage}</p></div>`
         : filtered.map((j) => renderJobCard(j, false)).join('')}
     </div>
     </div>
@@ -285,7 +473,10 @@ function renderDashboard() {
 
 function renderSaved() {
   const savedIds = getSavedIds();
-  const savedJobs = JOBS.filter((j) => savedIds.includes(j.id));
+  const savedJobs = JOBS.filter((j) => savedIds.includes(j.id)).map((j) => ({
+    ...j,
+    matchScore: computeMatchScore(j, getPreferences())
+  }));
 
   if (savedJobs.length === 0) {
     return `
@@ -324,40 +515,54 @@ function renderDigest() {
 }
 
 function renderSettings() {
+  const prefs = getPreferences() || DEFAULT_PREFERENCES;
+  const locations = getUniqueValues(JOBS, 'location');
+
   return `
     <div class="kn-page__header">
       <h1 class="kn-page__title">Settings</h1>
       <p class="kn-page__subtext">Configure your job preferences.</p>
     </div>
-    <div class="kn-settings">
+    <form id="settings-form" class="kn-settings">
       <div class="kn-settings__field">
         <label class="kn-settings__label" for="role-keywords">Role keywords</label>
-        <input type="text" id="role-keywords" class="kn-input" placeholder="e.g. Frontend, React, Full Stack">
+        <input type="text" id="role-keywords" class="kn-input" placeholder="e.g. Frontend, React, Full Stack" value="${prefs.roleKeywords || ''}">
       </div>
       <div class="kn-settings__field">
-        <label class="kn-settings__label" for="locations">Preferred locations</label>
-        <input type="text" id="locations" class="kn-input" placeholder="e.g. Bangalore, Remote">
-      </div>
-      <div class="kn-settings__field">
-        <label class="kn-settings__label" for="mode">Mode</label>
-        <select id="mode" class="kn-input kn-input--select">
-          <option value="">Select mode</option>
-          <option value="remote">Remote</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="onsite">Onsite</option>
+        <label class="kn-settings__label" for="preferred-locations">Preferred locations</label>
+        <select id="preferred-locations" class="kn-input kn-input--select kn-input--multi" multiple>
+          ${locations.map((l) => `<option value="${l}" ${(prefs.preferredLocations || []).includes(l) ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
+        <span class="kn-settings__hint">Hold Ctrl/Cmd to select multiple</span>
       </div>
       <div class="kn-settings__field">
-        <label class="kn-settings__label" for="experience">Experience level</label>
-        <select id="experience" class="kn-input kn-input--select">
+        <label class="kn-settings__label">Preferred mode</label>
+        <div class="kn-settings__checkboxes">
+          <label class="kn-settings__checkbox-label"><input type="checkbox" name="preferred-mode" value="Remote" ${(prefs.preferredMode || []).includes('Remote') ? 'checked' : ''}> Remote</label>
+          <label class="kn-settings__checkbox-label"><input type="checkbox" name="preferred-mode" value="Hybrid" ${(prefs.preferredMode || []).includes('Hybrid') ? 'checked' : ''}> Hybrid</label>
+          <label class="kn-settings__checkbox-label"><input type="checkbox" name="preferred-mode" value="Onsite" ${(prefs.preferredMode || []).includes('Onsite') ? 'checked' : ''}> Onsite</label>
+        </div>
+      </div>
+      <div class="kn-settings__field">
+        <label class="kn-settings__label" for="experience-level">Experience level</label>
+        <select id="experience-level" class="kn-input kn-input--select">
           <option value="">Select level</option>
-          <option value="entry">Entry</option>
-          <option value="mid">Mid</option>
-          <option value="senior">Senior</option>
-          <option value="lead">Lead</option>
+          <option value="Fresher" ${prefs.experienceLevel === 'Fresher' ? 'selected' : ''}>Fresher</option>
+          <option value="0-1" ${prefs.experienceLevel === '0-1' ? 'selected' : ''}>0-1</option>
+          <option value="1-3" ${prefs.experienceLevel === '1-3' ? 'selected' : ''}>1-3</option>
+          <option value="3-5" ${prefs.experienceLevel === '3-5' ? 'selected' : ''}>3-5</option>
         </select>
       </div>
-    </div>
+      <div class="kn-settings__field">
+        <label class="kn-settings__label" for="skills">Skills</label>
+        <input type="text" id="skills" class="kn-input" placeholder="e.g. React, Python, Java" value="${prefs.skills || ''}">
+      </div>
+      <div class="kn-settings__field">
+        <label class="kn-settings__label" for="min-match-score">Minimum match threshold: <span id="min-match-value">${prefs.minMatchScore ?? 40}</span></label>
+        <input type="range" id="min-match-score" class="kn-slider" min="0" max="100" value="${prefs.minMatchScore ?? 40}">
+      </div>
+      <button type="submit" class="kn-btn kn-btn--primary">Save Preferences</button>
+    </form>
   `;
 }
 
