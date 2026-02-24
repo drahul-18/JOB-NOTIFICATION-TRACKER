@@ -28,6 +28,18 @@
     <section class="kn-page" id="page-content"></section>
   </main>
 
+  <div id="modal-backdrop" class="kn-modal-backdrop" aria-hidden="true"></div>
+  <div id="modal" class="kn-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+    <div class="kn-modal__content">
+      <h2 id="modal-title" class="kn-modal__title"></h2>
+      <p class="kn-modal__company"></p>
+      <div class="kn-modal__skills"></div>
+      <p class="kn-modal__description"></p>
+      <button type="button" class="kn-btn kn-btn--secondary kn-modal__close">Close</button>
+    </div>
+  </div>
+
+  <script src="data/jobs.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
