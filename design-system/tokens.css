@@ -1,0 +1,72 @@
+/**
+ * KodNest Premium Build System — Design Tokens
+ * Calm, Intentional, Coherent, Confident
+ * Maximum 4 colors. No gradients, no glassmorphism, no neon.
+ */
+
+:root {
+  /* ─── COLOR SYSTEM ─── */
+  --kn-color-bg: #F7F6F3;
+  --kn-color-text: #111111;
+  --kn-color-accent: #8B0000;
+  --kn-color-success: #4A6B4A;
+  --kn-color-warning: #8B7355;
+  
+  /* Semantic aliases */
+  --kn-color-primary: var(--kn-color-accent);
+  --kn-color-border: rgba(17, 17, 17, 0.12);
+  --kn-color-border-focus: var(--kn-color-accent);
+  --kn-color-muted: rgba(17, 17, 17, 0.6);
+  
+  /* ─── TYPOGRAPHY ─── */
+  --kn-font-serif: "Libre Baskerville", "Georgia", "Times New Roman", serif;
+  --kn-font-sans: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  
+  /* Heading scale — serif, large, confident */
+  --kn-font-size-h1: 2.5rem;
+  --kn-font-size-h2: 2rem;
+  --kn-font-size-h3: 1.5rem;
+  --kn-font-size-h4: 1.25rem;
+  
+  /* Body — clean sans-serif */
+  --kn-font-size-body: 1rem;
+  --kn-font-size-body-lg: 1.125rem;
+  --kn-line-height-body: 1.65;
+  --kn-line-height-heading: 1.3;
+  
+  /* Text block constraint */
+  --kn-text-max-width: 720px;
+  
+  /* ─── SPACING SYSTEM ─── */
+  /* 8px, 16px, 24px, 40px, 64px — never random values */
+  --kn-space-xs: 8px;
+  --kn-space-sm: 16px;
+  --kn-space-md: 24px;
+  --kn-space-lg: 40px;
+  --kn-space-xl: 64px;
+  
+  /* ─── LAYOUT ─── */
+  --kn-workspace-ratio: 70%;
+  --kn-panel-ratio: 30%;
+  --kn-layout-gap: var(--kn-space-md);
+  --kn-topbar-height: 56px;
+  --kn-footer-height: 80px;
+  
+  /* ─── COMPONENTS ─── */
+  --kn-radius: 6px;
+  --kn-border-width: 1px;
+  --kn-transition: 175ms ease-in-out;
+  
+  /* Button */
+  --kn-btn-padding-y: var(--kn-space-xs);
+  --kn-btn-padding-x: var(--kn-space-sm);
+  --kn-btn-height: 40px;
+  
+  /* Input */
+  --kn-input-height: 44px;
+  --kn-input-padding: var(--kn-space-sm);
+  
+  /* Card */
+  --kn-card-padding: var(--kn-space-md);
+  --kn-card-border: var(--kn-border-width) solid var(--kn-color-border);
+}

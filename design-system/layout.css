@@ -1,0 +1,152 @@
+/**
+ * KodNest Premium Build System — Layout Structure
+ * [Top Bar] → [Context Header] → [Primary Workspace + Secondary Panel] → [Proof Footer]
+ */
+
+/* ─── APP SHELL ─── */
+.kn-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ─── TOP BAR ─── */
+.kn-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--kn-topbar-height);
+  padding: 0 var(--kn-space-md);
+  border-bottom: var(--kn-card-border);
+  background-color: var(--kn-color-bg);
+  flex-shrink: 0;
+}
+
+.kn-topbar__project {
+  font-family: var(--kn-font-serif);
+  font-size: var(--kn-font-size-h4);
+  font-weight: 600;
+  color: var(--kn-color-text);
+}
+
+.kn-topbar__progress {
+  font-size: var(--kn-font-size-body);
+  color: var(--kn-color-muted);
+}
+
+.kn-topbar__status {
+  /* Status badge — see components */
+}
+
+/* ─── CONTEXT HEADER ─── */
+.kn-context-header {
+  padding: var(--kn-space-lg) var(--kn-space-md) var(--kn-space-md);
+  flex-shrink: 0;
+}
+
+.kn-context-header__title {
+  font-family: var(--kn-font-serif);
+  font-size: var(--kn-font-size-h1);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.kn-context-header__subtext {
+  font-size: var(--kn-font-size-body);
+  color: var(--kn-color-muted);
+  margin: var(--kn-space-xs) 0 0;
+  max-width: var(--kn-text-max-width);
+}
+
+/* ─── MAIN CONTENT AREA ─── */
+.kn-main {
+  display: flex;
+  flex: 1;
+  gap: var(--kn-layout-gap);
+  padding: var(--kn-space-md);
+  min-height: 0;
+}
+
+/* ─── PRIMARY WORKSPACE (70%) ─── */
+.kn-workspace {
+  flex: 0 0 var(--kn-workspace-ratio);
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* ─── SECONDARY PANEL (30%) ─── */
+.kn-panel {
+  flex: 0 0 var(--kn-panel-ratio);
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kn-space-md);
+}
+
+.kn-panel__section {
+  /* Step explanation, prompt box, actions */
+}
+
+/* ─── PROOF FOOTER ─── */
+.kn-proof-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--kn-space-lg);
+  height: var(--kn-footer-height);
+  padding: 0 var(--kn-space-md);
+  border-top: var(--kn-card-border);
+  background-color: var(--kn-color-bg);
+  flex-shrink: 0;
+}
+
+.kn-proof-footer__item {
+  display: flex;
+  align-items: center;
+  gap: var(--kn-space-xs);
+  font-size: var(--kn-font-size-body);
+  color: var(--kn-color-muted);
+}
+
+.kn-proof-footer__item--complete {
+  color: var(--kn-color-success);
+}
+
+.kn-proof-footer__checkbox {
+  width: 18px;
+  height: 18px;
+  border: var(--kn-border-width) solid var(--kn-color-border);
+  border-radius: var(--kn-radius);
+  background: var(--kn-color-bg);
+  cursor: pointer;
+  transition: border-color var(--kn-transition), background-color var(--kn-transition);
+}
+
+.kn-proof-footer__checkbox:hover {
+  border-color: var(--kn-color-accent);
+}
+
+.kn-proof-footer__checkbox--checked {
+  background-color: var(--kn-color-accent);
+  border-color: var(--kn-color-accent);
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 900px) {
+  .kn-main {
+    flex-direction: column;
+  }
+
+  .kn-workspace,
+  .kn-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .kn-proof-footer {
+    flex-wrap: wrap;
+    height: auto;
+    padding: var(--kn-space-sm) var(--kn-space-md);
+    gap: var(--kn-space-sm);
+  }
+}

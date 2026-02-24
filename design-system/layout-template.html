@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KodNest Premium Build System — Layout Template</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body class="kn-app">
+  <!-- TOP BAR -->
+  <header class="kn-topbar">
+    <span class="kn-topbar__project">Project Name</span>
+    <span class="kn-topbar__progress">Step 2 / 5</span>
+    <span class="kn-badge kn-badge--in-progress kn-topbar__status">In Progress</span>
+  </header>
+
+  <!-- CONTEXT HEADER -->
+  <section class="kn-context-header">
+    <h1 class="kn-context-header__title">Define Your Requirements</h1>
+    <p class="kn-context-header__subtext">Describe what you want to build in clear, specific terms.</p>
+  </section>
+
+  <!-- MAIN: WORKSPACE + PANEL -->
+  <main class="kn-main">
+    <!-- PRIMARY WORKSPACE (70%) -->
+    <div class="kn-workspace">
+      <div class="kn-card">
+        <h3 class="kn-card__title">Primary Content Area</h3>
+        <p class="kn-card__body">Main product interaction happens here. Clean cards, predictable components.</p>
+      </div>
+    </div>
+
+    <!-- SECONDARY PANEL (30%) -->
+    <aside class="kn-panel">
+      <p class="kn-panel__step">Write a short description of what you need. Be specific about features and constraints.</p>
+      <div class="kn-prompt-box">
+        <code>Example: Build a dashboard with user list, search, and export to CSV.</code>
+        <div class="kn-prompt-box__actions">
+          <button class="kn-btn kn-btn--primary">Copy</button>
+          <button class="kn-btn kn-btn--secondary">Build in Lovable</button>
+        </div>
+      </div>
+      <div class="kn-panel__actions">
+        <button class="kn-btn kn-btn--secondary">It Worked</button>
+        <button class="kn-btn kn-btn--secondary">Error</button>
+        <button class="kn-btn kn-btn--secondary">Add Screenshot</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- PROOF FOOTER -->
+  <footer class="kn-proof-footer">
+    <label class="kn-proof-footer__item">
+      <span class="kn-proof-footer__checkbox" role="checkbox" aria-checked="false"></span>
+      UI Built
+    </label>
+    <label class="kn-proof-footer__item">
+      <span class="kn-proof-footer__checkbox" role="checkbox" aria-checked="false"></span>
+      Logic Working
+    </label>
+    <label class="kn-proof-footer__item">
+      <span class="kn-proof-footer__checkbox" role="checkbox" aria-checked="false"></span>
+      Test Passed
+    </label>
+    <label class="kn-proof-footer__item">
+      <span class="kn-proof-footer__checkbox" role="checkbox" aria-checked="false"></span>
+      Deployed
+    </label>
+  </footer>
+</body>
+</html>
