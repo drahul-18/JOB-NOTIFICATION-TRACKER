@@ -112,11 +112,15 @@
   max-width: var(--kn-text-max-width);
 }
 
+.kn-page__header {
+  margin-bottom: var(--kn-space-lg);
+}
+
 .kn-page__title {
   font-family: var(--kn-font-serif);
   font-size: var(--kn-font-size-h1);
   font-weight: 600;
-  margin: 0 0 var(--kn-space-sm);
+  margin: 0 0 var(--kn-space-xs);
   letter-spacing: -0.02em;
 }
 
@@ -125,6 +129,76 @@
   color: var(--kn-color-muted);
   margin: 0;
   line-height: var(--kn-line-height-body);
+}
+
+/* ─── LANDING PAGE ─── */
+.kn-landing {
+  padding: var(--kn-space-xl) 0;
+}
+
+.kn-landing__headline {
+  font-family: var(--kn-font-serif);
+  font-size: var(--kn-font-size-h1);
+  font-weight: 600;
+  margin: 0 0 var(--kn-space-sm);
+  letter-spacing: -0.02em;
+  line-height: var(--kn-line-height-heading);
+}
+
+.kn-landing__subtext {
+  font-size: var(--kn-font-size-body-lg);
+  color: var(--kn-color-muted);
+  margin: 0 0 var(--kn-space-lg);
+  line-height: var(--kn-line-height-body);
+}
+
+.kn-landing__cta {
+  text-decoration: none;
+}
+
+/* ─── SETTINGS FORM ─── */
+.kn-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kn-space-md);
+  max-width: 480px;
+}
+
+.kn-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kn-space-xs);
+}
+
+.kn-settings__label {
+  font-size: var(--kn-font-size-body);
+  font-weight: 500;
+  color: var(--kn-color-text);
+}
+
+.kn-input--select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23111111' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--kn-space-sm) center;
+  padding-right: 36px;
+}
+
+/* ─── EMPTY STATES ─── */
+.kn-empty {
+  padding: var(--kn-space-xl);
+  border: var(--kn-border-width) dashed var(--kn-color-border);
+  border-radius: var(--kn-radius);
+  background-color: transparent;
+}
+
+.kn-empty__message {
+  font-size: var(--kn-font-size-body);
+  color: var(--kn-color-muted);
+  margin: 0;
+  text-align: center;
+  max-width: none;
 }
 
 /* ─── RESPONSIVE: HAMBURGER MENU ─── */
