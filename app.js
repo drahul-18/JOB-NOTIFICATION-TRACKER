@@ -6,6 +6,10 @@
 const ROUTES = ['', 'dashboard', 'saved', 'digest', 'settings', 'proof'];
 const SAVED_IDS_KEY = 'job-tracker-saved-ids';
 const PREFERENCES_KEY = 'jobTrackerPreferences';
+const STATUS_KEY = 'jobTrackerStatus';
+const STATUS_UPDATES_KEY = 'jobTrackerStatusUpdates';
+
+const JOB_STATUSES = ['Not Applied', 'Applied', 'Rejected', 'Selected'];
 
 const DEFAULT_PREFERENCES = {
   roleKeywords: '',
@@ -22,6 +26,7 @@ let filterState = {
   mode: '',
   experience: '',
   source: '',
+  status: '',
   sort: 'latest',
   showMatchesOnly: false
 };
@@ -75,6 +80,62 @@ function isSaved(id) {
   return getSavedIds().includes(id);
 }
 
+function getJobStatuses() {
+  try {
+    const raw = localStorage.getItem(STATUS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function getJobStatus(jobId) {
+  const statuses = getJobStatuses();
+  return statuses[jobId] || 'Not Applied';
+}
+
+function setJobStatus(jobId, status, job) {
+  const statuses = getJobStatuses();
+  statuses[jobId] = status;
+  localStorage.setItem(STATUS_KEY, JSON.stringify(statuses));
+
+  if (['Applied', 'Rejected', 'Selected'].includes(status) && job) {
+    const updates = getStatusUpdates();
+    updates.unshift({
+      jobId,
+      title: job.title,
+      company: job.company,
+      status,
+      dateChanged: new Date().toISOString()
+    });
+    localStorage.setItem(STATUS_UPDATES_KEY, JSON.stringify(updates.slice(0, 50)));
+  }
+}
+
+function getStatusUpdates() {
+  try {
+    const raw = localStorage.getItem(STATUS_UPDATES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function showToast(message) {
+  const existing = document.getElementById('toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'toast';
+  toast.className = 'kn-toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('kn-toast--visible'));
+  setTimeout(() => {
+    toast.classList.remove('kn-toast--visible');
+    setTimeout(() => toast.remove(), 200);
+  }, 2500);
+}
+
 function getDigestKey(date) {
   const d = date || new Date();
   const y = d.getFullYear();
@@ -116,6 +177,36 @@ function getOrGenerateDigest() {
   const existing = getTodayDigest();
   if (existing) return existing;
   return generateTodayDigest();
+}
+
+function formatStatusDate(isoStr) {
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('en-IN', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function renderStatusUpdatesSection() {
+  const updates = getStatusUpdates();
+  if (updates.length === 0) return '';
+
+  return `
+    <div class="kn-digest-status-updates">
+      <h3 class="kn-digest-status-updates__title">Recent Status Updates</h3>
+      <div class="kn-digest-status-updates__list">
+        ${updates.slice(0, 10).map((u) => `
+          <div class="kn-digest-status-update">
+            <span class="kn-digest-status-update__title">${u.title}</span>
+            <span class="kn-digest-status-update__company">${u.company}</span>
+            <span class="kn-digest-status-update__status kn-digest-status-update__status--${u.status.toLowerCase().replace(/\s+/g, '-')}">${u.status}</span>
+            <span class="kn-digest-status-update__date">${formatStatusDate(u.dateChanged)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function formatDigestAsPlainText(jobs) {
@@ -255,6 +346,10 @@ function getFilteredJobs(jobs) {
     );
   }
 
+  if (filterState.status) {
+    result = result.filter((j) => getJobStatus(j.id) === filterState.status);
+  }
+
   if (filterState.showMatchesOnly && prefs) {
     const threshold = prefs.minMatchScore ?? 40;
     result = result.filter((j) => j.matchScore >= threshold);
@@ -313,6 +408,10 @@ function renderFilterBar(container, jobs) {
         <option value="">All sources</option>
         ${sources.map((s) => `<option value="${s}" ${filterState.source === s ? 'selected' : ''}>${s}</option>`).join('')}
       </select>
+      <select class="kn-input kn-input--select kn-filters__select" data-filter="status">
+        <option value="">All</option>
+        ${JOB_STATUSES.map((s) => `<option value="${s}" ${filterState.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
       <select class="kn-input kn-input--select kn-filters__select" data-filter="sort">
         <option value="latest" ${filterState.sort === 'latest' ? 'selected' : ''}>Latest</option>
         <option value="oldest" ${filterState.sort === 'oldest' ? 'selected' : ''}>Oldest</option>
@@ -346,10 +445,22 @@ function renderFilterBar(container, jobs) {
   });
 }
 
+function getStatusBadgeClass(status) {
+  const map = {
+    'Not Applied': 'kn-job-card__status--neutral',
+    Applied: 'kn-job-card__status--applied',
+    Rejected: 'kn-job-card__status--rejected',
+    Selected: 'kn-job-card__status--selected'
+  };
+  return map[status] || 'kn-job-card__status--neutral';
+}
+
 function renderJobCard(job, showUnsave = false) {
   const saved = isSaved(job.id);
   const score = job.matchScore ?? 0;
   const scoreClass = getMatchScoreBadgeClass(score);
+  const status = getJobStatus(job.id);
+  const statusClass = getStatusBadgeClass(status);
 
   return `
     <article class="kn-job-card" data-id="${job.id}">
@@ -364,6 +475,9 @@ function renderJobCard(job, showUnsave = false) {
       <p class="kn-job-card__meta">${job.location} · ${job.mode} · ${job.experience}</p>
       <p class="kn-job-card__salary">${job.salaryRange}</p>
       <p class="kn-job-card__posted">${formatPosted(job.postedDaysAgo)}</p>
+      <div class="kn-job-card__status-group">
+        ${JOB_STATUSES.map((s) => `<button type="button" class="kn-job-card__status-btn ${status === s ? statusClass : ''}" data-action="set-status" data-id="${job.id}" data-status="${s}">${s}</button>`).join('')}
+      </div>
       <div class="kn-job-card__actions">
         <button type="button" class="kn-btn kn-btn--secondary kn-job-card__btn" data-action="view" data-id="${job.id}">View</button>
         <button type="button" class="kn-btn kn-btn--secondary kn-job-card__btn" data-action="${saved && showUnsave ? 'unsave' : 'save'}" data-id="${job.id}">${saved && showUnsave ? 'Unsave' : 'Save'}</button>
@@ -498,6 +612,20 @@ function bindPageEvents(content, route) {
   }
 
   if (route === 'dashboard' || route === 'saved') {
+    content.querySelectorAll('[data-action="set-status"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const id = parseInt(e.target.dataset.id, 10);
+        const status = e.target.dataset.status;
+        const job = JOBS.find((j) => j.id === id);
+        if (job) {
+          setJobStatus(id, status, job);
+          if (['Applied', 'Rejected', 'Selected'].includes(status)) {
+            showToast(`Status updated: ${status}`);
+          }
+          renderPage(route);
+        }
+      });
+    });
     content.querySelectorAll('[data-action="view"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const id = parseInt(e.target.dataset.id, 10);
@@ -634,6 +762,7 @@ function renderDigest() {
         <div class="kn-digest-block">
           <p class="kn-digest-block__message">No matching roles today. Check again tomorrow.</p>
         </div>
+        ${renderStatusUpdatesSection()}
       </div>
     `;
   }
@@ -648,6 +777,7 @@ function renderDigest() {
           <button type="button" class="kn-btn kn-btn--secondary" data-action="generate-digest">Generate Today's 9AM Digest (Simulated)</button>
         </div>
         <p class="kn-digest__note">Demo Mode: Daily 9AM trigger simulated manually.</p>
+        ${renderStatusUpdatesSection()}
       </div>
     `;
   }
@@ -687,6 +817,7 @@ function renderDigest() {
           <a href="#" class="kn-btn kn-btn--secondary" data-action="email-draft">Create Email Draft</a>
         </div>
       </div>
+      ${renderStatusUpdatesSection()}
     </div>
   `;
 }
