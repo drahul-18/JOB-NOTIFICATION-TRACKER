@@ -902,6 +902,103 @@
   margin: 0;
 }
 
+/* ─── PROOF PAGE ─── */
+.kn-page--proof {
+  max-width: 640px;
+}
+
+.kn-proof-badge {
+  display: inline-block;
+  padding: var(--kn-space-xs) var(--kn-space-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--kn-radius);
+  border: var(--kn-border-width) solid;
+  margin-left: var(--kn-space-sm);
+}
+
+.kn-proof-badge--not-started {
+  color: var(--kn-color-muted);
+  border-color: var(--kn-color-border);
+}
+
+.kn-proof-badge--in-progress {
+  color: var(--kn-color-warning);
+  border-color: var(--kn-color-warning);
+}
+
+.kn-proof-badge--shipped {
+  color: var(--kn-color-success);
+  border-color: var(--kn-color-success);
+}
+
+.kn-proof-section {
+  margin-bottom: var(--kn-space-lg);
+}
+
+.kn-proof-section__title {
+  font-family: var(--kn-font-serif);
+  font-size: var(--kn-font-size-h4);
+  font-weight: 600;
+  margin: 0 0 var(--kn-space-sm);
+}
+
+.kn-proof-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kn-space-xs);
+}
+
+.kn-proof-step {
+  display: flex;
+  align-items: center;
+  gap: var(--kn-space-sm);
+  padding: var(--kn-space-sm);
+  border: var(--kn-border-width) solid var(--kn-color-border);
+  border-radius: var(--kn-radius);
+}
+
+.kn-proof-step__status {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  min-width: 72px;
+}
+
+.kn-proof-step--done .kn-proof-step__status {
+  color: var(--kn-color-success);
+}
+
+.kn-proof-artifacts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kn-space-md);
+}
+
+.kn-proof-error {
+  font-size: 0.75rem;
+  color: var(--kn-color-accent);
+  margin-top: var(--kn-space-xs);
+  display: block;
+}
+
+.kn-proof-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kn-space-sm);
+  margin-bottom: var(--kn-space-md);
+}
+
+.kn-proof-shipped {
+  font-size: var(--kn-font-size-body);
+  color: var(--kn-color-success);
+  margin: 0;
+  padding: var(--kn-space-md);
+  border: var(--kn-border-width) solid var(--kn-color-success);
+  border-radius: var(--kn-radius);
+  background-color: rgba(74, 107, 74, 0.06);
+}
+
 /* ─── RESPONSIVE: HAMBURGER MENU ─── */
 @media (max-width: 768px) {
   .kn-nav__toggle {

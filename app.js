@@ -3,7 +3,8 @@
  * Client-side routing, filtering, match scoring, and job rendering
  */
 
-const ROUTES = ['', 'dashboard', 'saved', 'digest', 'settings', 'proof', 'jt/07-test', 'jt/08-ship'];
+const ROUTES = ['', 'dashboard', 'saved', 'digest', 'settings', 'proof', 'jt/07-test', 'jt/08-ship', 'jt/proof'];
+const PROOF_ARTIFACTS_KEY = 'jobTrackerProofArtifacts';
 const TEST_CHECKLIST_KEY = 'jobTrackerTestChecklist';
 
 const TEST_ITEMS = [
@@ -158,6 +159,51 @@ function getAllTestsPassed() {
   const checklist = getTestChecklist();
   return TEST_ITEMS.every((item) => checklist[item.id] === true);
 }
+
+function getProofArtifacts() {
+  try {
+    const raw = localStorage.getItem(PROOF_ARTIFACTS_KEY);
+    return raw ? JSON.parse(raw) : { githubUrl: '', deployedUrl: '' };
+  } catch {
+    return { githubUrl: '', deployedUrl: '' };
+  }
+}
+
+function saveProofArtifacts(artifacts) {
+  localStorage.setItem(PROOF_ARTIFACTS_KEY, JSON.stringify(artifacts));
+}
+
+function isValidUrl(str) {
+  if (!str || typeof str !== 'string') return false;
+  try {
+    const url = new URL(str.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function getProjectStatus() {
+  const artifacts = getProofArtifacts();
+  const hasGithub = isValidUrl(artifacts.githubUrl);
+  const hasDeployed = isValidUrl(artifacts.deployedUrl);
+  const allTestsPassed = getAllTestsPassed();
+
+  if (allTestsPassed && hasGithub && hasDeployed) return 'shipped';
+  if (hasGithub || hasDeployed || allTestsPassed) return 'in-progress';
+  return 'not-started';
+}
+
+const PROOF_STEPS = [
+  { id: 1, label: 'Design system created', check: () => true },
+  { id: 2, label: 'Route skeleton', check: () => true },
+  { id: 3, label: 'Landing and app skeleton', check: () => true },
+  { id: 4, label: 'Job dataset and rendering', check: () => true },
+  { id: 5, label: 'Preferences and match scoring', check: () => !!getPreferences() },
+  { id: 6, label: 'Digest engine', check: () => !!getTodayDigest() },
+  { id: 7, label: 'Status tracking', check: () => Object.keys(getJobStatuses()).length > 0 || getStatusUpdates().length > 0 },
+  { id: 8, label: 'Test checklist', check: () => getAllTestsPassed() }
+];
 
 function getTestsPassedCount() {
   const checklist = getTestChecklist();
@@ -574,7 +620,8 @@ function renderPage(route) {
     settings: renderSettings,
     proof: renderProof,
     'jt/07-test': renderTestChecklist,
-    'jt/08-ship': renderShip
+    'jt/08-ship': renderShip,
+    'jt/proof': renderJtProof
   };
 
   const render = pages[route] || renderLanding;
@@ -623,6 +670,69 @@ function bindPageEvents(content, route) {
       };
       savePreferences(prefs);
       navigate('dashboard');
+    });
+  }
+
+  if (route === 'jt/proof') {
+    content.querySelector('[data-action="save-proof"]')?.addEventListener('click', () => {
+      const github = content.querySelector('#proof-github')?.value?.trim() || '';
+      const deployed = content.querySelector('#proof-deployed')?.value?.trim() || '';
+      const githubError = content.querySelector('#proof-github-error');
+      const deployedError = content.querySelector('#proof-deployed-error');
+      let valid = true;
+      if (github && !isValidUrl(github)) {
+        if (githubError) githubError.textContent = 'Enter a valid URL';
+        valid = false;
+      } else if (githubError) githubError.textContent = '';
+      if (deployed && !isValidUrl(deployed)) {
+        if (deployedError) deployedError.textContent = 'Enter a valid URL';
+        valid = false;
+      } else if (deployedError) deployedError.textContent = '';
+      if (valid) {
+        saveProofArtifacts({ githubUrl: github, deployedUrl: deployed });
+        if (githubError) githubError.textContent = '';
+        if (deployedError) deployedError.textContent = '';
+        renderPage('jt/proof');
+        setActiveNav('jt/proof');
+      }
+    });
+    content.querySelector('[data-action="copy-submission"]')?.addEventListener('click', () => {
+      const github = content.querySelector('#proof-github')?.value?.trim() || '';
+      const deployed = content.querySelector('#proof-deployed')?.value?.trim() || '';
+      const artifacts = getProofArtifacts();
+      if (github && isValidUrl(github)) artifacts.githubUrl = github;
+      if (deployed && isValidUrl(deployed)) artifacts.deployedUrl = deployed;
+      saveProofArtifacts(artifacts);
+      const text = `------------------------------------------
+Job Notification Tracker — Final Submission
+
+GitHub Repository:
+${artifacts.githubUrl || '(not provided)'}
+
+Live Deployment:
+${artifacts.deployedUrl || '(not provided)'}
+
+Core Features:
+- Intelligent match scoring
+- Daily digest simulation
+- Status tracking
+- Test checklist enforced
+------------------------------------------`;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Submission copied to clipboard');
+      });
+    });
+    content.querySelector('#proof-github')?.addEventListener('blur', (e) => {
+      const v = e.target.value?.trim();
+      const err = content.querySelector('#proof-github-error');
+      if (v && !isValidUrl(v) && err) err.textContent = 'Enter a valid URL';
+      else if (err) err.textContent = '';
+    });
+    content.querySelector('#proof-deployed')?.addEventListener('blur', (e) => {
+      const v = e.target.value?.trim();
+      const err = content.querySelector('#proof-deployed-error');
+      if (v && !isValidUrl(v) && err) err.textContent = 'Enter a valid URL';
+      else if (err) err.textContent = '';
     });
   }
 
@@ -979,8 +1089,62 @@ function renderTestChecklist() {
   `;
 }
 
+function renderJtProof() {
+  const artifacts = getProofArtifacts();
+  const status = getProjectStatus();
+  const statusLabels = { 'not-started': 'Not Started', 'in-progress': 'In Progress', shipped: 'Shipped' };
+
+  return `
+    <div class="kn-page kn-page--proof">
+      <div class="kn-page__header">
+        <h1 class="kn-page__title">Project 1 — Job Notification Tracker</h1>
+        <span class="kn-proof-badge kn-proof-badge--${status}">${statusLabels[status]}</span>
+      </div>
+
+      <section class="kn-proof-section">
+        <h2 class="kn-proof-section__title">A) Step Completion Summary</h2>
+        <div class="kn-proof-steps">
+          ${PROOF_STEPS.map((s) => {
+            const done = s.check();
+            return `
+            <div class="kn-proof-step ${done ? 'kn-proof-step--done' : ''}">
+              <span class="kn-proof-step__status">${done ? 'Completed' : 'Pending'}</span>
+              <span class="kn-proof-step__label">${s.label}</span>
+            </div>
+          `;
+          }).join('')}
+        </div>
+      </section>
+
+      <section class="kn-proof-section">
+        <h2 class="kn-proof-section__title">B) Artifact Collection Inputs</h2>
+        <div class="kn-proof-artifacts">
+          <div class="kn-settings__field">
+            <label class="kn-settings__label" for="proof-github">GitHub Repository Link</label>
+            <input type="url" id="proof-github" class="kn-input" placeholder="https://github.com/..." value="${artifacts.githubUrl || ''}">
+            <span class="kn-proof-error" id="proof-github-error"></span>
+          </div>
+          <div class="kn-settings__field">
+            <label class="kn-settings__label" for="proof-deployed">Deployed URL (Vercel or equivalent)</label>
+            <input type="url" id="proof-deployed" class="kn-input" placeholder="https://your-app.vercel.app" value="${artifacts.deployedUrl || ''}">
+            <span class="kn-proof-error" id="proof-deployed-error"></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="kn-proof-actions">
+        <button type="button" class="kn-btn kn-btn--secondary" data-action="save-proof">Save Artifacts</button>
+        <button type="button" class="kn-btn kn-btn--primary" data-action="copy-submission">Copy Final Submission</button>
+      </div>
+
+      ${status === 'shipped' ? '<p class="kn-proof-shipped">Project 1 Shipped Successfully.</p>' : ''}
+    </div>
+  `;
+}
+
 function renderShip() {
   const allPassed = getAllTestsPassed();
+  const status = getProjectStatus();
 
   if (!allPassed) {
     return `
@@ -996,14 +1160,30 @@ function renderShip() {
     `;
   }
 
+  if (status === 'shipped') {
+    return `
+      <div class="kn-page kn-page--ship">
+        <div class="kn-page__header">
+          <h1 class="kn-page__title">Ship</h1>
+          <span class="kn-proof-badge kn-proof-badge--shipped">Shipped</span>
+        </div>
+        <div class="kn-ship-unlocked">
+          <p class="kn-proof-shipped">Project 1 Shipped Successfully.</p>
+          <p class="kn-ship-unlocked__message">All quality checks complete. You may proceed with deployment.</p>
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="kn-page kn-page--ship">
       <div class="kn-page__header">
         <h1 class="kn-page__title">Ship</h1>
-        <p class="kn-page__subtext">All tests passed. Ready to ship.</p>
+        <p class="kn-page__subtext">All tests passed. Add proof artifacts to mark as Shipped.</p>
       </div>
       <div class="kn-ship-unlocked">
-        <p class="kn-ship-unlocked__message">All quality checks complete. You may proceed with deployment.</p>
+        <p class="kn-ship-unlocked__message">Complete artifact collection on the Proof page to mark Project 1 as Shipped.</p>
+        <a href="#/jt/proof" class="kn-btn kn-btn--primary">Go to Proof</a>
       </div>
     </div>
   `;
